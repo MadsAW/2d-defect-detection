@@ -1,5 +1,8 @@
 from skimage.draw import disk
 from scipy.ndimage import rotate
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import connected_components
+from scipy.spatial import KDTree
 import math
 import numpy as np
 import matplotlib.pyplot as plt
@@ -273,3 +276,96 @@ def lock_peaks_to_lattice(
     Cr = relaxed_crystal[Cr, :]
     SBr = relaxed_crystal[SBr, :]
     return Cr, SBr, lat_vectors
+
+def find_connected_components(links):
+    """
+    Find connected components in an undirected graph given as a list of links.
+
+    This function takes a list of connections (edges) between nodes in an undirected graph,
+    constructs an adjacency matrix, and uses SciPy's sparse graph utilities to identify
+    all connected components.
+
+    Parameters
+    ----------
+    links : list of tuple of int
+        A list of (node_a, node_b) tuples representing edges in the graph.
+
+    Returns
+    -------
+    list of list of int
+        A list where each element is a sorted list of node indices belonging
+        to the same connected component.
+
+    Example
+    -------
+    >>> links = [(0, 1), (1, 2), (3, 4)]
+    >>> find_connected_components(links)
+    [[0, 1, 2], [3, 4]]
+    """
+    max_node = max(max(pair) for pair in links)
+    adjacency_matrix = np.zeros((max_node + 1, max_node + 1), dtype=int)
+    
+    for a, b in links:
+        adjacency_matrix[a][b] = 1
+        adjacency_matrix[b][a] = 1  # Since it's an undirected graph
+    
+    # Convert the adjacency matrix to a sparse CSR matrix
+    sparse_matrix = csr_matrix(adjacency_matrix)
+    
+    # Find connected components
+    n_components, labels = connected_components(sparse_matrix, directed=False)
+    
+    # Group nodes by their component labels
+    components = {}
+    for node, label in enumerate(labels):
+        if label not in components:
+            components[label] = []
+        components[label].append(node)
+    
+    # Return the components as a list of sorted lists
+    return [sorted(component) for component in components.values()]
+
+def find_connected_defects(peaks, vector, threshold=20):
+    """
+    Identify and group defects in a lattice based on relative displacements.
+
+    This function compares each peak's position to a shifted version of the lattice
+    (defined by a translation vector). Peaks that have a close neighbor (within the
+    given threshold) in the shifted lattice are considered connected. These
+    connections are used to identify defect regions as connected components.
+
+    Parameters
+    ----------
+    peaks : ndarray (Nx2)
+        Array of 2D peak coordinates representing detected atomic positions.
+    vector : ndarray (2,)
+        The translation vector to compare peak displacements against.
+    threshold : float, optional
+        The maximum allowed distance between a peak and its translated neighbor
+        to consider them connected. Default is 20 pixels.
+
+    Returns
+    -------
+    clusters : ndarray (N,)
+        An array where each element is the cluster label assigned to the corresponding
+        peak. Peaks with the same label are considered part of the same defect region.
+
+    Example
+    -------
+    >>> clusters = find_connected_defects(peaks, vector=np.array([1, 0]), threshold=15)
+    """
+    peak_tree = KDTree(peaks, leafsize=100)
+    distances, neighbours = peak_tree.query(peaks - vector)
+    
+    mask = distances < threshold
+    chosen_neighbours = np.vstack([np.where(mask)[0], neighbours[mask]]).T
+
+    # Identify connected components from the neighbor links
+    components = find_connected_components(chosen_neighbours)
+
+    # Assign a cluster label to each peak based on connected components
+    clusters = np.arange(len(peaks))
+    for i, cluster in enumerate(components):
+        clusters[cluster] = i
+
+    return clusters
