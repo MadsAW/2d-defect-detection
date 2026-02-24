@@ -1,6 +1,6 @@
 # 2D Defect Detection using Deep Learning
 
-**🚨 Update (4th June, 2025): our paper got published in PrX for using this framework to investigate the defects in CrSBr read more!** https://journals.aps.org/prx/abstract/10.1103/PhysRevX.15.021080
+**🚨 Update (4th June, 2025): our paper got published in PRX for using this framework to investigate the defects in CrSBr read more!** https://journals.aps.org/prx/abstract/10.1103/PhysRevX.15.021080
 
 This repository presents an advanced deep learning framework for detecting defects in 2D multi-layer material STEM-HAADF (Scanning Transmission Electron Microscopy - High-Angle Annular Dark-Field) images. Our focus is on 2L CrSBr, where we not only identify defect distributions but also analyze complex structures that emerge.
 
